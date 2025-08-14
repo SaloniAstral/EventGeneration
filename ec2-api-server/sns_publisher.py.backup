@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 """
-SNS Event Publisher - AWS Event System
-=====================================
-
-This file sends events to AWS SNS when stock data is updated.
-It handles:
-- Sending notifications when new stock data arrives
-- Event formatting and validation
-- AWS SNS connection management
-- Error handling and retries
-
-Think of this as the "messenger" that tells other services when new data is available.
-"""
+SNS Event Publisher
+Sends events when stock data is loaded or updated
+ Application events → AWS SNS → Other services
 """
 
 import boto3

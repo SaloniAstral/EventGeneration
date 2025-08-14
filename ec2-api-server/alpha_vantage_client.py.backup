@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Alpha Vantage API Client - Stock Data Fetcher
-============================================
-
-This file connects to Alpha Vantage API to get real-time stock data.
-It handles:
-- Fetching stock prices and company info
-- Rate limiting (5 calls per minute)
-- Error handling and retries
-- Data validation and formatting
-
-Think of this as the "data source" that gets stock prices from the internet.
+Alpha Vantage API Client
+Fetches stock data from Alpha Vantage API with rate limiting
 """
 
 import requests

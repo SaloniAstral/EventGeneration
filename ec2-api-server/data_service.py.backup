@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Data Service - Data Flow Orchestrator
-====================================
-
-This file manages the complete data flow process:
-- Fetches stock data from Alpha Vantage
-- Stores data in MongoDB database
-- Sends SNS events to notify other services
-- Handles scheduling and retries
-- Manages data quality and validation
-
-Think of this as the "conductor" that orchestrates the entire data collection process.
+Data Service
+Orchestrates the complete data flow: fetch → store → send events
 """
 
 import time
