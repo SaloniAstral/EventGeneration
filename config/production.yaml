@@ -1,0 +1,74 @@
+# Production Environment Configuration
+# Financial Data Streaming System
+
+environment: production
+debug: false
+
+database:
+  mongodb_uri: "mongodb://mongodb:27017/stockdata"
+  mongodb_database: "stockdata"
+  connection_timeout: 30000
+  max_pool_size: 100
+  retry_writes: true
+
+api:
+  alpha_vantage_api_key: "${ALPHA_VANTAGE_API_KEY}"
+  alpha_vantage_base_url: "https://www.alphavantage.co/query"
+  api_rate_limit: 5
+  request_timeout: 30
+  max_retries: 3
+
+aws:
+  region: "us-east-2"
+  sns_topic_arn: "${SNS_TOPIC_ARN}"
+  use_iam_role: true
+
+kafka:
+  bootstrap_servers: "kafka:9092"
+  topic: "stock-ticks"
+  group_id: "financial-streaming-prod"
+  auto_offset_reset: "latest"
+  enable_auto_commit: true
+
+accumulo:
+  instance_name: "stockdata"
+  zookeeper_hosts: "zookeeper:2181"
+  username: "root"
+  password: "${ACCUMULO_PASSWORD}"
+  table_name: "stock_ticks"
+
+service:
+  api_server_host: "0.0.0.0"
+  api_server_port: 8000
+  stream_receiver_host: "0.0.0.0"
+  stream_receiver_port: 8002
+  driver_host: "0.0.0.0"
+  driver_port: 8001
+  monitoring_host: "0.0.0.0"
+  monitoring_port: 8080
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "/var/log/financial-streaming/app.log"
+  max_file_size: 10485760  # 10MB
+  backup_count: 10
+
+security:
+  enable_ssl: true
+  ssl_cert_path: "/etc/ssl/certs/financial-streaming.crt"
+  ssl_key_path: "/etc/ssl/private/financial-streaming.key"
+  cors_origins:
+    - "https://financial-streaming.example.com"
+    - "https://dashboard.financial-streaming.example.com"
+  api_key_required: true
+  jwt_secret: "${JWT_SECRET}"
+
+monitoring:
+  health_check_interval: 30
+  metrics_collection_interval: 60
+  alert_check_interval: 60
+  response_time_warning: 1.0
+  response_time_error: 3.0
+  error_rate_warning: 0.01
+  error_rate_error: 0.05 
