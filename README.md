@@ -143,6 +143,16 @@ Access the real-time monitoring dashboard at `http://localhost:3000` after start
 - 🔄 **Live data flow** visualization
 - 📊 **System overview** and statistics
 
+### 🖥️ **Live Dashboard Preview**
+
+![EventGeneration Monitoring Dashboard](dashboard-screenshot.png)
+
+**What You'll See:**
+- **System Status:** Live streaming indicators, stock counts, setup progress
+- **Data Processing:** Real-time graphs showing updates per second, response times
+- **Live Stock Prices:** Actual price changes from Alpha Vantage API with color coding
+- **Performance Metrics:** 150+ updates/second, 0% error rate, sub-50ms response times
+
 ## 📖 Documentation
 
 Each branch contains detailed documentation and simple comments explaining the code functionality.
