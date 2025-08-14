@@ -1,0 +1,394 @@
+name: Financial Data Streaming System - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+jobs:
+  # Test and Quality Checks
+  test:
+    name: Test and Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r tests/requirements.txt
+        pip install -r ec2_api_server/requirements.txt
+        pip install -r ec2_stream_receiver/requirements.txt
+        pip install -r ec2_driver/requirements.txt
+        pip install -r monitoring/requirements.txt
+        pip install -r config/requirements.txt
+        
+    - name: Run linting
+      run: |
+        cd tests
+        python run_tests.py --lint --strict
+        
+    - name: Run security scan
+      run: |
+        cd tests
+        python run_tests.py --security
+        
+    - name: Run unit tests
+      run: |
+        cd tests
+        python run_tests.py --test-type unit --coverage
+        
+    - name: Run integration tests
+      run: |
+        cd tests
+        python run_tests.py --test-type integration --coverage
+        
+    - name: Run API tests
+      run: |
+        cd tests
+        python run_tests.py --test-type api --coverage
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: test_results/
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: test_results/coverage/
+
+  # Build and Push Docker Images
+  build:
+    name: Build and Push Docker Images
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build and push API Server image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./ec2_api_server
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-api-server-${{ github.event.inputs.environment || 'staging' }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-api-server-${{ github.event.inputs.environment || 'staging' }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push Stream Receiver image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./ec2_stream_receiver
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-stream-receiver-${{ github.event.inputs.environment || 'staging' }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-stream-receiver-${{ github.event.inputs.environment || 'staging' }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push Driver image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./ec2_driver
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-driver-${{ github.event.inputs.environment || 'staging' }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-driver-${{ github.event.inputs.environment || 'staging' }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push Monitoring image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./monitoring
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-monitoring-${{ github.event.inputs.environment || 'staging' }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/financial-streaming-monitoring-${{ github.event.inputs.environment || 'staging' }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Deploy to staging
+      run: |
+        chmod +x deployment/deploy.sh
+        ./deployment/deploy.sh staging ${{ env.AWS_REGION }}
+        
+    - name: Run post-deployment tests
+      run: |
+        # Get ALB DNS name from CloudFormation
+        ALB_DNS=$(aws cloudformation describe-stacks --stack-name financial-streaming-staging-cluster --query 'Stacks[0].Outputs[?OutputKey==`ApplicationLoadBalancerDNS`].OutputValue' --output text)
+        
+        # Wait for services to be ready
+        sleep 60
+        
+        # Test health endpoints
+        curl -f http://$ALB_DNS/health || exit 1
+        curl -f http://$ALB_DNS:8002/health || exit 1
+        curl -f http://$ALB_DNS:8001/health || exit 1
+        curl -f http://$ALB_DNS:8080/health || exit 1
+        
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ Staging deployment completed successfully!"
+        echo "ALB DNS: $(aws cloudformation describe-stacks --stack-name financial-streaming-staging-cluster --query 'Stacks[0].Outputs[?OutputKey==`ApplicationLoadBalancerDNS`].OutputValue' --output text)"
+        
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ Staging deployment failed!"
+        # Add notification logic here (Slack, email, etc.)
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Deploy to production
+      run: |
+        chmod +x deployment/deploy.sh
+        ./deployment/deploy.sh production ${{ env.AWS_REGION }}
+        
+    - name: Run post-deployment tests
+      run: |
+        # Get ALB DNS name from CloudFormation
+        ALB_DNS=$(aws cloudformation describe-stacks --stack-name financial-streaming-production-cluster --query 'Stacks[0].Outputs[?OutputKey==`ApplicationLoadBalancerDNS`].OutputValue' --output text)
+        
+        # Wait for services to be ready
+        sleep 60
+        
+        # Test health endpoints
+        curl -f http://$ALB_DNS/health || exit 1
+        curl -f http://$ALB_DNS:8002/health || exit 1
+        curl -f http://$ALB_DNS:8001/health || exit 1
+        curl -f http://$ALB_DNS:8080/health || exit 1
+        
+        # Test API endpoints
+        curl -f http://$ALB_DNS/api/v1/stocks || exit 1
+        curl -f http://$ALB_DNS:8002/api/v1/stream/status || exit 1
+        
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ Production deployment completed successfully!"
+        echo "ALB DNS: $(aws cloudformation describe-stacks --stack-name financial-streaming-production-cluster --query 'Stacks[0].Outputs[?OutputKey==`ApplicationLoadBalancerDNS`].OutputValue' --output text)"
+        
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ Production deployment failed!"
+        # Add notification logic here (Slack, email, etc.)
+
+  # Performance Testing
+  performance-test:
+    name: Performance Testing
+    needs: [deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r tests/requirements.txt
+        
+    - name: Run performance tests
+      run: |
+        cd tests
+        python run_tests.py --test-type performance
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: test_results/performance_tests.html
+
+  # Security Scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Dependency Check
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install safety
+      run: pip install safety
+      
+    - name: Run safety check
+      run: |
+        safety check --json --output safety-report.json || true
+        
+    - name: Upload safety report
+      uses: actions/upload-artifact@v3
+      with:
+        name: safety-report
+        path: safety-report.json
+
+  # Documentation
+  documentation:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install pdoc3 mkdocs mkdocs-material
+        
+    - name: Generate API documentation
+      run: |
+        pdoc --html --output-dir docs/api ec2_api_server
+        pdoc --html --output-dir docs/api ec2_stream_receiver
+        
+    - name: Build documentation site
+      run: |
+        mkdocs build
+        
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: site/
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Cleanup old ECR images
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Remove old images
+      run: |
+        # Remove images older than 30 days
+        aws ecr describe-repositories --query 'repositories[?contains(repositoryName, `financial-streaming`)].repositoryName' --output text | while read repo; do
+          aws ecr list-images --repository-name $repo --query 'imageDetails[?imagePushedAt<`'$(date -d '30 days ago' --iso-8601=seconds)'`].imageDigest' --output text | while read digest; do
+            aws ecr batch-delete-image --repository-name $repo --image-ids imageDigest=$digest
+          done
+        done 
