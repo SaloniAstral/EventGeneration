@@ -68,7 +68,11 @@ git branch -a  # See all branches
 
 3. **Start the system:**
    ```bash
-   ./quick_start.sh
+   # Start Docker services
+   docker-compose up -d
+   
+   # Or use the deployment script
+   ./deploy_local.sh
    ```
 
 ## 📊 System Flow
@@ -79,46 +83,45 @@ git branch -a  # See all branches
 4. **Real-time Processing** (`ec2-stream-receiver`): Processes streaming data
 5. **Monitoring** (`monitoring-dashboard`): Provides real-time system monitoring
 
-## 📦 **Complete ZIP Package Structure**
+## 📁 **Repository Structure**
 
-When you download our **Complete ZIP**, you get this organized structure:
+Each branch contains its specific functionality with shared infrastructure:
 
 ```
-EventGeneration-Complete-AllCode/
-├── main/                           # Core infrastructure
-│   ├── config/                     # Configuration management
-│   ├── database/                   # MongoDB manager
-│   ├── shared/                     # Kafka client & utilities
-│   ├── docker/                     # Docker configuration
-│   └── docs/                       # Documentation
-│
-├── ec2-api-server/                 # Data ingestion & REST API
-│   ├── main.py                     # FastAPI server
-│   ├── alpha_vantage_client.py     # Stock data fetcher
-│   ├── data_service.py             # Data flow orchestrator
-│   └── sns_publisher.py            # AWS SNS events
-│
-├── ec2-driver/                     # Times Square streaming simulator
-│   ├── main.py                     # Streaming simulator
-│   ├── mongodb_database_reader.py  # Database reader
-│   ├── config/                     # Configuration
-│   ├── shared/                     # Shared utilities
-│   └── database/                   # MongoDB manager
-│
-├── ec2-stream-receiver/            # Real-time stream processing
-│   ├── main.py                     # Stream processor
-│   ├── accumulo_client.py          # In-memory buffer
-│   ├── config/                     # Configuration
-│   ├── shared/                     # Shared utilities
-│   └── database/                   # MongoDB manager
-│
-└── monitoring-dashboard/            # System monitoring
-    ├── monitoring_dashboard.py      # Main dashboard
-    ├── health_checker.py            # Health monitoring
-    ├── metrics_collector.py         # Performance metrics
-    ├── config/                      # Configuration
-    ├── shared/                      # Shared utilities
-    └── database/                    # MongoDB manager
+main/                               # Core infrastructure
+├── config/                         # Configuration management
+├── database/                       # MongoDB manager
+├── shared/                         # Kafka client & utilities
+├── docker/                         # Docker configuration
+└── docs/                           # Documentation
+
+ec2-api-server/                     # Data ingestion & REST API
+├── main.py                         # FastAPI server
+├── alpha_vantage_client.py         # Stock data fetcher
+├── data_service.py                 # Data flow orchestrator
+└── sns_publisher.py                # AWS SNS events
+
+ec2-driver/                         # Times Square streaming simulator
+├── main.py                         # Streaming simulator
+├── mongodb_database_reader.py      # Database reader
+├── config/                         # Configuration
+├── shared/                         # Shared utilities
+└── database/                       # MongoDB manager
+
+ec2-stream-receiver/                # Real-time stream processing
+├── main.py                         # Stream processor
+├── accumulo_client.py              # In-memory buffer
+├── config/                         # Configuration
+├── shared/                         # Shared utilities
+└── database/                       # MongoDB manager
+
+monitoring-dashboard/                # System monitoring
+├── monitoring_dashboard.py          # Main dashboard
+├── health_checker.py                # Health monitoring
+├── metrics_collector.py             # Performance metrics
+├── config/                          # Configuration
+├── shared/                          # Shared utilities
+└── database/                        # MongoDB manager
 ```
 
 ## 🎯 Key Features
@@ -129,6 +132,16 @@ EventGeneration-Complete-AllCode/
 - ✅ **Real-time monitoring dashboard**
 - ✅ **Scalable AWS infrastructure**
 - ✅ **Docker containerization**
+
+## 📊 **Monitoring Dashboard**
+
+Access the real-time monitoring dashboard at `http://localhost:3000` after starting the system.
+
+**Dashboard Features:**
+- 🟢 **Real-time health status** of all services
+- 📈 **Performance metrics** (TPS, latency, error rates)
+- 🔄 **Live data flow** visualization
+- 📊 **System overview** and statistics
 
 ## 📖 Documentation
 
