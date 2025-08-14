@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-EC2 Stream Receiver - Real-time Data Processing
-==============================================
-
-This is the stream processor that:
-- Receives real-time stock ticks from the driver
-- Stores data in simulated Accumulo (in-memory buffer)
-- Processes and transforms the data
-- Sends processed data to Kafka for downstream consumption
-- Provides health monitoring and processing status
-
-Think of this as the "data processor" that handles real-time streaming data.
+EC2 Stream Receiver - Main Application
+Handles real-time stock data processing with simulated Accumulo
 """
 
 import asyncio

@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Simulated Accumulo Client - In-Memory Data Buffer
-================================================
-
-This file simulates Accumulo database operations for streaming data.
-It handles:
-- Storing real-time stock ticks in memory
-- Data indexing and retrieval
-- Stream processing operations
-- Data persistence and cleanup
-
-Think of this as a "moving buffer" that holds streaming data temporarily.
+Simulated Accumulo Client for EC2 Stream Receiver
+This simulates Accumulo operations without the heavy resource usage
 """
 
 import json
