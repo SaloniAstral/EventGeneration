@@ -1,0 +1,5 @@
+# Environment files with sensitive data
+.env
+*.env
+docker/.env
+ec2-api-server/.env
