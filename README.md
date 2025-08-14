@@ -20,7 +20,7 @@ The system consists of **4 main EC2 instances**, each with a dedicated branch:
 
 **⚠️ Important:** Each branch contains only its specific EC2 instance code + shared infrastructure. 
 
-**💡 Pro Tip:** GitHub's "Download ZIP" only gives you the main branch. Use our **Complete ZIP** to get ALL EC2 instance code in one package!
+**💡 Pro Tip:** Use `git clone --recursive` to get ALL branches automatically!
 
 ## 🔧 Technology Stack
 
@@ -33,19 +33,21 @@ The system consists of **4 main EC2 instances**, each with a dedicated branch:
 
 ## 🚀 Quick Start
 
-### **Option 1: Download Complete ZIP (Recommended for Non-Developers)**
-**Get ALL your code without Git knowledge!**
+### **Option 1: Clone All Branches at Once (Recommended)**
+```bash
+git clone --recursive https://github.com/SaloniAstral/EventGeneration.git
+cd EventGeneration
+git branch -a  # See all branches
+```
 
-📦 **[Download Complete ZIP](EventGeneration-Complete-AllCode.zip)** - Contains all EC2 instance code organized by folder
-
-**What's in the ZIP:**
+**What you get:**
 - ✅ **main/** - Core infrastructure
 - ✅ **ec2-api-server/** - Data ingestion & REST API
 - ✅ **ec2-driver/** - Times Square streaming simulator
 - ✅ **ec2-stream-receiver/** - Real-time stream processing
 - ✅ **monitoring-dashboard/** - System monitoring
 
-### **Option 2: Git Clone (For Developers)**
+### **Option 2: Clone Main + Fetch All Branches**
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/SaloniAstral/EventGeneration.git
@@ -138,24 +140,22 @@ Each branch contains detailed documentation and simple comments explaining the c
 If you only see the main branch content, you need to access other branches:
 
 ```bash
-# List all available branches
-git branch -r
+# Option 1: Clone with ALL branches (Recommended)
+git clone --recursive https://github.com/SaloniAstral/EventGeneration.git
 
-# Switch to see EC2-API-Server code
-git checkout ec2-api-server
+# Option 2: If you already cloned, fetch all branches
+git fetch origin
+git branch -r  # List all available branches
 
-# Switch to see EC2-Driver code  
-git checkout ec2-driver
-
-# Switch to see EC2-Stream-Receiver code
-git checkout ec2-stream-receiver
-
-# Switch to see Monitoring-Dashboard code
-git checkout monitoring-dashboard
+# Switch to see specific EC2 instance code
+git checkout ec2-api-server      # Data ingestion
+git checkout ec2-driver          # Streaming simulator
+git checkout ec2-stream-receiver # Stream processing
+git checkout monitoring-dashboard # System monitoring
 ```
 
 ### **"How do I see all code at once?"**
-Each branch contains only its specific functionality. This is intentional for clean organization. Switch between branches to explore different components.
+Use `git clone --recursive` to get all branches automatically! Each branch contains only its specific functionality for clean organization.
 
 ## 🤝 Contributing
 
