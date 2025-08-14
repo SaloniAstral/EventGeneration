@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Monitoring Dashboard - Real-time System Monitoring
-================================================
-
-This is the main monitoring dashboard that:
-- Provides real-time system health monitoring
-- Shows live metrics and performance data
-- Displays stock data streaming status
-- Offers web-based visualization interface
-- Monitors all EC2 instances and services
-
-Think of this as the "control center" that shows everything happening in the system.
+Monitoring Dashboard for Financial Data Streaming System
+Provides real-time monitoring and metrics visualization
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect

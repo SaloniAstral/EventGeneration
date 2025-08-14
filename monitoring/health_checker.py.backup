@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Health Checker - System Health Monitoring
-========================================
-
-This file monitors the health of all system components:
-- Checks if all EC2 instances are running
-- Monitors database connections
-- Verifies API endpoints are responding
-- Tests external service connections
-- Reports system status and alerts
-
-Think of this as the "doctor" that checks if everything is working properly.
+Comprehensive Health Checker for Financial Data Streaming System
+Checks all services, databases, and external dependencies
 """
 
 import asyncio

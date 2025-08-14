@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Metrics Collector - Performance Data Collection
-==============================================
-
-This file collects performance metrics from all system components:
-- Gathers data processing statistics
-- Monitors streaming performance
-- Tracks API response times
-- Collects error rates and success metrics
-- Aggregates data for dashboard display
-
-Think of this as the "data collector" that gathers performance information.
+Metrics Collector for Financial Data Streaming System
+Collects and aggregates metrics from all EC2 instances
 """
 
 import time
