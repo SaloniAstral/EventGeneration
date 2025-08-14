@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 """
-MongoDB Database Reader - Stock Data Access
-==========================================
-
-This file reads stock data from the MongoDB database for the streaming simulator.
-It handles:
-- Reading stock prices and company information
-- Filtering data by symbols and time ranges
-- Data formatting for streaming
-- Connection management and error handling
-
-Think of this as the "data reader" that gets stock data from the database for streaming.
-"""
+MongoDB Database Reader for EC2 Driver
+Reads stock data from MongoDB database
+Updated to use MongoDB with PyMongo
 """
 
 import requests
