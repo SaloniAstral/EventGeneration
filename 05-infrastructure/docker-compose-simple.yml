@@ -1,0 +1,243 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: financial-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: stockdata
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - financial-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: financial-zookeeper
+    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - financial-network
+    healthcheck:
+      test: echo stat | nc localhost 2181
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: financial-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - financial-network
+    healthcheck:
+      test: kafka-topics --bootstrap-server localhost:9092 --list
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis (for caching and session management)
+  redis:
+    image: redis:7-alpine
+    container_name: financial-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - financial-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # EC2 API Server
+  api-server:
+    build:
+      context: ..
+      dockerfile: 01-api-server/Dockerfile
+    image: financial-api-server:latest
+    container_name: financial-api-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/stockdata?authSource=admin
+      - MONGODB_DATABASE=stockdata
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-AS0C2O859HMRJXVL}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - SNS_TOPIC_ARN=${SNS_TOPIC_ARN:-arn:aws:sns:us-east-2:000936194577:stock-data-events}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_NAME=stock-ticks
+      - KAFKA_GROUP_ID=api-server-group
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - financial-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # EC2 Driver (Times Square Simulator)
+  driver:
+    build:
+      context: ..
+      dockerfile: 02-driver/Dockerfile
+    image: financial-driver:latest
+    container_name: financial-driver
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/stockdata?authSource=admin
+      - MONGODB_DATABASE=stockdata
+      - STOCK_THRESHOLD=${STOCK_THRESHOLD:-5}
+      - TICK_INTERVAL=${TICK_INTERVAL:-1.0}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - SNS_TOPIC_ARN=${SNS_TOPIC_ARN:-arn:aws:sns:us-east-2:000936194577:stock-data-events}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_NAME=stock-ticks
+      - KAFKA_GROUP_ID=driver-group
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      api-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - financial-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # EC2 Stream Receiver
+  stream-receiver:
+    build:
+      context: ..
+      dockerfile: 03-streaming/Dockerfile
+    image: financial-stream-receiver:latest
+    container_name: financial-stream-receiver
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/stockdata?authSource=admin
+      - MONGODB_DATABASE=stockdata
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - SNS_TOPIC_ARN=${SNS_TOPIC_ARN:-arn:aws:sns:us-east-2:000936194577:stock-data-events}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_NAME=stock-ticks
+      - KAFKA_GROUP_ID=stream-receiver-group
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - financial-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring Dashboard
+  monitoring:
+    build:
+      context: ..
+      dockerfile: 04-monitoring/Dockerfile
+    image: financial-monitoring:latest
+    container_name: financial-monitoring
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - API_SERVER_URL=http://financial-api-server:8000
+      - DRIVER_URL=http://financial-driver:8001
+      - STREAM_RECEIVER_URL=http://financial-stream-receiver:8002
+      - LOG_LEVEL=INFO
+    networks:
+      - financial-network
+    depends_on:
+      api-server:
+        condition: service_healthy
+      stream-receiver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  financial-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
